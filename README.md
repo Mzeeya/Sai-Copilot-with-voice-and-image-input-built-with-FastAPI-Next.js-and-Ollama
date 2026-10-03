@@ -1,72 +1,188 @@
-# AI Assistant — Full Stack
+<div align="center">
 
-A production-ready AI chat application. It runs **local models through Ollama
-first** and falls back to **cloud AI** (Anthropic, OpenAI, Google Gemini, xAI
-Grok, Meta Llama) when no local model is installed or a local model fails.
+# 🤖 OpenChat
 
+### A private AI assistant that runs on your own machine, with 🎤 voice and 🖼️ image input
+
+![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.13+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Ollama](https://img.shields.io/badge/Ollama-Local_LLMs-1F2937?style=for-the-badge)
+![Whisper](https://img.shields.io/badge/faster--whisper-Speech_to_Text-2DD4BF?style=for-the-badge)
+
+**Local-first • Free • Open source tools only • No data leaves your computer by default**
+
+</div>
+
+<!-- After you add a screenshot to docs/screenshot.png, remove this line's comment marks:
+![OpenChat screenshot](docs/screenshot.png)
+-->
+
+---
+
+## ✨ Features
+
+| | Feature | What it does |
+|---|---|---|
+| 💬 | **Streaming chat** | Replies appear word by word, with history, copy and regenerate |
+| 🎤 | **Voice input** | Click the mic, speak, and your words are transcribed locally by faster-whisper |
+| 🖼️ | **Image understanding** | Attach up to 4 images and ask questions about them, powered by gemma3 vision |
+| 🏠 | **Local models** | Runs on [Ollama](https://ollama.com), so your chats stay on your machine |
+| ☁️ | **Cloud fallback** | Optional: add an API key and the app can fall back to a cloud model |
+| 🔀 | **Model picker** | Switch between your installed models from the menu |
+
+---
+
+## 🧩 How it works
+
+```mermaid
+flowchart LR
+    A["🌐 Browser<br/>Next.js UI"] -->|"text + images"| B["⚡ FastAPI backend"]
+    A -->|"🎤 WAV audio"| B
+    B -->|"/api/chat"| C["🦙 Ollama<br/>gemma3"]
+    B -->|"/api/transcribe"| D["🗣️ faster-whisper"]
+    B -.->|"optional fallback"| E["☁️ Cloud providers"]
 ```
-ai-app/
-├── api/   FastAPI · Python 3.13 · uv · ruff · pytest · Ollama SDK · Anthropic / OpenAI SDKs
-└── web/   Next.js 16 · React 19 · TypeScript 7 · Tailwind CSS 4 · shadcn/ui
-```
 
-## Quick start
+### 🎤 Voice input flow
 
-**Requirements:** Python 3.13 with [uv](https://docs.astral.sh/uv/), Node.js 20.9+,
-and optionally [Ollama](https://ollama.com).
+1. The browser records your voice with `MediaRecorder`
+2. The Web Audio API converts it to a 16 kHz mono WAV file
+3. The WAV is uploaded to `POST /api/transcribe`
+4. faster-whisper (Whisper `base` model, CPU) turns it into text
+5. The text lands in the input box so you can edit it before sending
+
+### 🖼️ Image understanding flow
+
+1. Pick images with the 🖼️ button (they are shrunk to 1024 px in the browser)
+2. Images travel with your message as base64 to `POST /api/chat`
+3. The backend passes them to Ollama's `images` field
+4. gemma3 reads the image and your question together and streams back an answer
+
+---
+
+## 🛠️ Tech stack
+
+| Layer | Tools |
+|---|---|
+| 🎨 Frontend | Next.js, React, Tailwind CSS |
+| ⚙️ Backend | FastAPI, Pydantic, uv, ruff, pytest |
+| 🧠 Language and vision model | Ollama + gemma3 |
+| 🗣️ Speech to text | faster-whisper |
+
+---
+
+## 🚀 Quick start
+
+### 📋 You will need
+
+- 🐍 Python 3.13 or newer and [uv](https://docs.astral.sh/uv/)
+- 🟢 Node.js 20 or newer
+- 🦙 [Ollama](https://ollama.com) installed and running
+
+### 1️⃣ Get the model
 
 ```bash
-# 1. Local models (optional but recommended)
-ollama pull llama3.2
+ollama pull gemma3
+```
 
-# 2. API  → http://localhost:8000/docs
+> 💡 The default `gemma3` (4B) understands images. The tiny `gemma3:1b` version does not.
+
+### 2️⃣ Start the backend
+
+```bash
 cd api
 uv sync
-cp .env.example .env            # add cloud API keys here if you have them
 uv run fastapi dev app/main.py
+```
 
-# 3. Web  → http://localhost:3000   (new terminal)
+The API runs at http://127.0.0.1:8000 and its interactive docs are at http://127.0.0.1:8000/docs
+
+### 3️⃣ Start the frontend (in a second terminal)
+
+```bash
 cd web
 npm install
-cp .env.example .env.local
 npm run dev
 ```
 
-Or with Docker: `cp api/.env.example api/.env && docker compose up --build`.
+### 4️⃣ Open the app
 
-## How model selection works
+Go to 👉 **http://localhost:3000**
 
-The model dropdown shows three groups:
+> 🎤 The very first voice message downloads the Whisper model once (needs internet). After that, it works offline.
 
-| Option | Behaviour |
-|---|---|
-| **Auto** (default) | First installed Ollama model; if none, the first cloud provider with a key |
-| **Local · Ollama** | Every chat model you've pulled, with size and parameter count |
-| **Cloud (fallback)** | One sub-menu per provider whose API key is set, listing its live models |
+### ☁️ Optional: cloud fallback
 
-If the chosen model fails before replying (Ollama stopped, model deleted, key
-out of quota), the API automatically tries the next option and the reply shows
-a small note saying which model answered instead. Set
-`ALLOW_CLOUD_FALLBACK=false` in `api/.env` to turn this off.
+Copy `api/.env.example` to `api/.env` and add a provider key. Never commit your `.env` file.
 
-Cloud order is controlled by `CLOUD_PRIORITY`, and each provider's preferred
-fallback model by `*_MODEL` (e.g. `OPENAI_MODEL`). Model lists are fetched live
-from each provider, so new models appear without code changes.
+---
 
-## Quality checks
+## 📁 Project structure
 
-```bash
-cd api && uv run ruff check . && uv run ruff format --check . && uv run pytest
-cd web && npm run typecheck && npm run build
+```
+openchat-ai-assistant/
+├── api/                      ⚙️ FastAPI backend
+│   ├── app/
+│   │   ├── core/             settings and logging
+│   │   ├── providers/        Ollama and cloud providers
+│   │   ├── routes/           chat, models, health, transcribe
+│   │   ├── services/         chat service and speech.py (Whisper)
+│   │   ├── schemas.py        request and response models
+│   │   └── main.py           app entry point
+│   └── tests/
+└── web/                      🎨 Next.js frontend
+    ├── app/                  pages and layout
+    ├── components/chat/      composer, messages, sidebar, model picker
+    ├── hooks/                use-chat, use-models
+    └── lib/                  API client, types, helpers
 ```
 
-## Production checklist
+---
 
-- Put both services behind HTTPS (a reverse proxy or your platform's load balancer).
-  Keep response buffering off for `/api/chat` so replies stream.
-- Set `ENVIRONMENT=production` (hides `/docs`) and a real `CORS_ORIGINS` if the
-  API is called from another domain.
-- Add authentication and rate limiting before exposing the API publicly;
-  cloud calls cost money.
-- Chat history is stored in each user's browser today. Add a database when you
-  add user accounts.
+## 🔌 API endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/chat` | Streams a reply (server-sent events), accepts optional `images` |
+| `POST` | `/api/transcribe` | Upload a 16 kHz WAV, get back `{ "text": "..." }` |
+| `GET` | `/api/models` | Lists the models available right now |
+| `GET` | `/api/health` | Health check |
+
+---
+
+## 🩺 Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| 🔴 "API offline" in the app | Start the backend: `uv run fastapi dev app/main.py` inside `api/` |
+| 🦙 No models listed | Start Ollama, run `ollama list`, then click **Refresh models** |
+| 🖼️ Model says "please provide the picture" | Use a vision model such as the default `gemma3` (not `gemma3:1b`) |
+| 🎤 Mic does nothing | Open the app at `http://localhost:3000` and allow microphone access |
+| ⏳ First voice message is slow | Whisper is downloading its model once, so just wait |
+
+---
+
+## 📝 Notes
+
+- 🖼️ Attached images are not saved in browser history, so after a page refresh the text of those messages stays and the pictures are gone
+- 🔒 Chats are stored only in your own browser (`localStorage`)
+
+---
+
+## 🗺️ Roadmap
+
+- [x] 💬 Streaming chat with local models
+- [x] 🎤 Voice input with faster-whisper
+- [x] 🖼️ Image understanding with gemma3
+- [ ] 🔊 Spoken replies (text-to-speech)
+- [ ] 📄 Chat with your own documents (RAG)
+- [ ] 💾 Save images in chat history
+
+---
+
+## 👤 Author
+
+**Muhammad Zia Ul Haq**
+
+Built while learning AI engineering. Feedback and ideas are welcome, so open an issue or say hi. ⭐ If this project helped you, consider giving it a star!
